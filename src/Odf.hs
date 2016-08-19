@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Odf where
 
-import Text.XML.HaXml.Schema.PrimitiveTypes (XsdString)
+import qualified Text.XML.HaXml.Schema.PrimitiveTypes as Xs
 
 import OdfXsd
+import Util.HaXml()
 
+newtype Path = Path String
 
 mkObjects :: ObjectsType
 mkObjects = ObjectsType
@@ -13,4 +15,8 @@ mkObjects = ObjectsType
         , objectsType_object = [] :: [ObjectType]
         }
  
+type PathValues = [(Path, String)]
+
+flattenOdf :: ObjectsType -> PathValues
+flattenOdf = undefined
 

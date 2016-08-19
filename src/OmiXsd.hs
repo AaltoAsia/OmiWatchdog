@@ -1,18 +1,18 @@
 {-# LANGUAGE MultiParamTypeClasses, OverloadedStrings #-}
-{-# OPTIONS_GHC -fno-warn-duplicate-exports #-}
+{-# OPTIONS_GHC -fno-warn-duplicate-exports -fno-warn-unused-matches -fno-warn-orphans #-}
 module OmiXsd
   ( module OmiXsd
   ) where
  
-import Text.XML.HaXml.Schema.Schema (SchemaType(..),SimpleType(..),Extension(..),Restricts(..))
+import Text.XML.HaXml.Schema.Schema (SchemaType(..),Extension(..))
 import Text.XML.HaXml.Schema.Schema as Schema
-import Text.XML.HaXml.OneOfN
+import Text.XML.HaXml.Posn (Posn)
+import Text.XML.HaXml.Types (Element)
+import Text.XML.HaXml.OneOfN()
 import qualified Text.XML.HaXml.Schema.PrimitiveTypes as Xs
-import Data.String (IsString(..))
- 
 
-instance IsString Xs.XsdString where
-    fromString = Xs.XsdString
+import OdfXsd
+ 
 
 -- Some hs-boot imports are required, for fwd-declaring types.
 
@@ -20,11 +20,14 @@ instance IsString Xs.XsdString where
 class GetOneOf a where
     getOneOf :: a -> OneOf4 ReadRequest WriteRequest ResponseListType CancelRequest
 
-    -- | takes the request and ttl
-    wrapToOmiEnvelope :: a -> Double -> OmiEnvelope
-    wrapToOmiEnvelope request ttl =
-        OmiEnvelope (Xs.XsdString "1.0") (Xs.XsdString $ show ttl) (getOneOf request)
+-- | takes the request and ttl
+wrapToOmiEnvelope :: (GetOneOf a) => a -> Double -> OmiEnvelope
+wrapToOmiEnvelope request ttl =
+    OmiEnvelope (Xs.XsdString "1.0") (Xs.XsdString $ show ttl) (getOneOf request)
     
+-- | A quick hack to include namespaces that are defined with name "omi"
+posnElement' :: [String] -> XMLParser (Posn, Element Posn)
+posnElement' = posnElement . concatMap (\s -> ["omi:"++s, s]) 
 
  
 -- | Root element of Open Messaging Interface.
@@ -48,7 +51,7 @@ data OmiEnvelope = OmiEnvelope
         deriving (Eq,Show)
 instance SchemaType OmiEnvelope where
     parseSchemaType s = do
-        (pos,e) <- posnElement [s]
+        (pos,e) <- posnElement' [s]
         a0 <- getAttribute "version" e pos
         a1 <- getAttribute "ttl" e pos
         commit $ interior e $ return (OmiEnvelope a0 a1)
@@ -74,15 +77,17 @@ elementOmiEnvelope = parseSchemaType "omiEnvelope"
 elementToXMLOmiEnvelope :: OmiEnvelope -> [Content ()]
 elementToXMLOmiEnvelope = schemaTypeToXML "omiEnvelope"
  
-data Msg = Msg 
+data Msg = Msg ObjectsType 
         deriving (Eq,Show)
 instance SchemaType Msg where
     parseSchemaType s = do
-        (pos,e) <- posnElement [s]
+        (pos,e) <- posnElement' [s]
         commit $ interior e $ return Msg
-    schemaTypeToXML s x@Msg{} =
+            `apply` head `fmap` between (Occurs (Just 1) (Just 1)) elementObjects
+    schemaTypeToXML s (Msg objects) =
         toXMLElement s []
-            []
+            [ (schemaTypeToXML "msg") objects
+            ]
  
 elementMsg :: XMLParser Msg
 elementMsg = parseSchemaType "msg"
@@ -112,7 +117,7 @@ data RequestBaseType = RequestBaseType
         deriving (Eq,Show)
 instance SchemaType RequestBaseType where
     parseSchemaType s = do
-        (pos,e) <- posnElement [s]
+        (pos,e) <- posnElement' [s]
         a0 <- optional $ getAttribute "callback" e pos
         a1 <- optional $ getAttribute "msgformat" e pos
         a2 <- optional $ getAttribute "targetType" e pos
@@ -167,7 +172,7 @@ data ReadRequest = ReadRequest
         deriving (Eq,Show)
 instance SchemaType ReadRequest where
     parseSchemaType s = do
-        (pos,e) <- posnElement [s]
+        (pos,e) <- posnElement' [s]
         a0 <- optional $ getAttribute "callback" e pos
         a1 <- optional $ getAttribute "msgformat" e pos
         a2 <- optional $ getAttribute "targetType" e pos
@@ -224,7 +229,7 @@ data WriteRequest = WriteRequest
         deriving (Eq,Show)
 instance SchemaType WriteRequest where
     parseSchemaType s = do
-        (pos,e) <- posnElement [s]
+        (pos,e) <- posnElement' [s]
         a0 <- optional $ getAttribute "callback" e pos
         a1 <- optional $ getAttribute "msgformat" e pos
         a2 <- optional $ getAttribute "targetType" e pos
@@ -255,7 +260,7 @@ data ResponseListType = ResponseListType
         deriving (Eq,Show)
 instance SchemaType ResponseListType where
     parseSchemaType s = do
-        (pos,e) <- posnElement [s]
+        (pos,e) <- posnElement' [s]
         commit $ interior e $ return ResponseListType
             `apply` many1 (parseSchemaType "result")
     schemaTypeToXML s x@ResponseListType{} =
@@ -288,12 +293,12 @@ data RequestResultType = RequestResultType
         deriving (Eq,Show)
 instance SchemaType RequestResultType where
     parseSchemaType s = do
-        (pos,e) <- posnElement [s]
+        (pos,e) <- posnElement' [s]
         a0 <- optional $ getAttribute "msgformat" e pos
         a1 <- optional $ getAttribute "targetType" e pos
         commit $ interior e $ return (RequestResultType a0 a1)
             `apply` between (Occurs (Just 1) Nothing)
-                            (parseSchemaType "return")
+                            (parseSchemaType "omi:return")
             `apply` optional (parseSchemaType "requestID")
             `apply` optional (elementMsg)
             `apply` optional (parseSchemaType "nodeList")
@@ -311,7 +316,7 @@ instance SchemaType RequestResultType where
  
 -- | Return status of request. Use HTTP codes / descriptions 
 --   when applicable.
-data ReturnType = ReturnType Xs.XsdString ReturnTypeAttributes deriving (Eq,Show)
+data ReturnType = ReturnType ReturnTypeAttributes deriving (Eq,Show)
 data ReturnTypeAttributes = ReturnTypeAttributes
     { returnTypeAttributes_returnCode :: Xs.XsdString
       -- ^ Use HTTP codes when applicable.
@@ -320,20 +325,20 @@ data ReturnTypeAttributes = ReturnTypeAttributes
     deriving (Eq,Show)
 instance SchemaType ReturnType where
     parseSchemaType s = do
-        (pos,e) <- posnElement [s]
+        (pos,e) <- posnElement' [s]
         commit $ do
           a0 <- getAttribute "returnCode" e pos
           a1 <- optional $ getAttribute "description" e pos
-          reparse [CElem e pos]
-          v <- parseSchemaType s
-          return $ ReturnType v (ReturnTypeAttributes a0 a1)
-    schemaTypeToXML s (ReturnType bt at) =
+          --reparse [CElem e pos]
+          --v <- parseSchemaType s
+          return $ ReturnType (ReturnTypeAttributes a0 a1)
+    schemaTypeToXML s (ReturnType at) =
         addXMLAttributes [ toXMLAttribute "returnCode" $ returnTypeAttributes_returnCode at
                          , maybe [] (toXMLAttribute "description") $ returnTypeAttributes_description at
                          ]
-            $ schemaTypeToXML s bt
-instance Extension ReturnType Xs.XsdString where
-    supertype (ReturnType s _) = s
+            []
+--instance Extension ReturnType Xs.XsdString where
+--    supertype (ReturnType s _) = s
  
 -- | The nodesType is used anywhere in the schema where lists of 
 --   nodes can appear.
@@ -349,7 +354,7 @@ data NodesType = NodesType
         deriving (Eq,Show)
 instance SchemaType NodesType where
     parseSchemaType s = do
-        (pos,e) <- posnElement [s]
+        (pos,e) <- posnElement' [s]
         a0 <- optional $ getAttribute "type" e pos
         commit $ interior e $ return (NodesType a0)
             `apply` many1 (parseSchemaType "node")
@@ -369,7 +374,7 @@ data IdTypeAttributes = IdTypeAttributes
     deriving (Eq,Show)
 instance SchemaType IdType where
     parseSchemaType s = do
-        (pos,e) <- posnElement [s]
+        (pos,e) <- posnElement' [s]
         commit $ do
           a0 <- optional $ getAttribute "format" e pos
           reparse [CElem e pos]
@@ -390,7 +395,7 @@ data CancelRequest = CancelRequest
         deriving (Eq,Show)
 instance SchemaType CancelRequest where
     parseSchemaType s = do
-        (pos,e) <- posnElement [s]
+        (pos,e) <- posnElement' [s]
         commit $ interior e $ return CancelRequest
             `apply` optional (parseSchemaType "nodeList")
             `apply` many1 (parseSchemaType "requestID")

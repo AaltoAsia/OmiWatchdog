@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
-{-# OPTIONS_GHC -fno-warn-duplicate-exports #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -fno-warn-duplicate-exports -fno-warn-unused-matches -fno-warn-orphans #-}
 module OdfXsd
   ( module OdfXsd
   ) where

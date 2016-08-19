@@ -25,7 +25,10 @@ executable K1DebugService
                      , network >=2.4.0.0 && <3
                      , url ==2.1.*
                      , text
-                     , HTTP ==4000.3.*
+                     --, HTTP ==4000.3.*
+                     , http-dispatch == 0.5.*
+                     , bytestring == 0.10.*
+                     , utf8-string == 1.0.*
 
   hs-source-dirs:      src
   default-language:    Haskell2010
