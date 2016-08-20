@@ -40,6 +40,18 @@ logError = hPutStr stderr
 
 processData :: PathValues -> IO ()
 processData = undefined
+-- calculate running avarage and standard deviation for update interval
+-- save to acid-state
+-- go through unchanged:
+--  To filter out false positives:
+--       longerThanUsual =
+--          if std.deviation < 60s && what? avarage*num
+--          then
+--              3 * avarage
+--          else
+--              3 * std.deviation
+--       
+--  alert if time > (avarage + longerThanUsual)
 
 main :: IO ()
 main = do
