@@ -12,15 +12,25 @@ import Data.Time.ISO8601 (parseISO8601)
 import OdfXsd
 import Util.HaXml()
 
-newtype Path = Path String
+newtype Path = Path {fromPath :: String}
 
-class ToPath p where
+class PathLike p where
     toPath :: p -> Path
-instance ToPath XsdString where
-    toPath = Path . simpleTypeText
-instance ToPath String where
-    toPath = Path
+    toPath = Path . asString
+    asString :: p -> String
+instance PathLike XsdString where
+    asString = simpleTypeText
+instance PathLike String where
+    asString = id
+instance PathLike Path where
+    toPath = id
+    asString = fromPath
 
+join :: PathLike p => Path -> p -> Path
+join a b = toPath (asString a ++ "/" ++ asString b)
+
+pathObjects :: Path
+pathObjects = Path "Objects"
 
 data OdfValue = OdfValue 
     { odfValue_timestamp :: UTCTime
@@ -58,15 +68,20 @@ mkObjects = ObjectsType
 type PathValue = (Path, OdfValue)
 type PathValues = [PathValue]
 
+-- | flatten ObjectsType to list of Path to value
 flattenOdf :: ObjectsType -> PathValues
-flattenOdf (ObjectsType _ objs) = concatMap flattenObject objs
+flattenOdf (ObjectsType _ objs) = concatMap (flattenObject pathObjects) objs
   where
-    flattenObject :: ObjectType -> PathValues
-    flattenObject (ObjectType _ _ _ infos objects) =
-        concatMap pathValue infos ++
-            concatMap flattenObject objects
+    flattenObject :: Path -> ObjectType -> PathValues
+    flattenObject parent (ObjectType _ ids _ infos objects) =
+        let [QlmID name _] = ids -- Should be non-empty-list
+            path = parent `join` name
+        in
+        concatMap (pathValue path) infos ++
+            concatMap (flattenObject path) objects
 
-    pathValue :: InfoItemType -> PathValues
-    pathValue (InfoItemType name _ _ _ values) =
-        map (\v -> (toPath name, fromValueType v)) values
+    pathValue :: Path -> InfoItemType -> PathValues
+    pathValue parent (InfoItemType name _ _ _ values) =
+        map (\v -> (toPath $ parent `join` name, fromValueType v)) values
+
 
