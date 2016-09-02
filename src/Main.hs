@@ -3,15 +3,16 @@ module Main where
 --import Text.Read (readMaybe)
 --import Data.Maybe (listToMaybe)
 import Control.Monad (when)
+import System.Environment (getArgs)
+import System.IO (hPutStr, stderr)
 
 --import qualified Network.HTTP.Server as HTTP
 --import Network.HTTP.Server (Config (..))
 --import Network.HTTP.Server.Logger (stdLogger)
 --import Network.Socket (PortNumber(..))
+import Data.Acid
 
-import System.Environment (getArgs)
-import System.IO (hPutStr, stderr)
-
+import WatchdogLogic
 import OmiClient
 import Omi
 import Odf
@@ -38,20 +39,6 @@ logError :: String -> IO ()
 logError = hPutStr stderr
 
 
-processData :: PathValues -> IO ()
-processData = undefined
--- calculate running avarage and standard deviation for update interval
--- save to acid-state
--- go through unchanged:
---  To filter out false positives:
---       longerThanUsual =
---          if std.deviation < 60s && what? avarage*num
---          then
---              3 * avarage
---          else
---              3 * std.deviation
---       
---  alert if time > (avarage + longerThanUsual)
 
 main :: IO ()
 main = do
@@ -63,6 +50,7 @@ main = do
     --    Nothing -> print usage
     --    Just config -> undefined
 
+    delayValues <- openLocalState emptyDelayStore
 
     result <- sendRequest (head args) readAllRequest
     case result of
@@ -74,7 +62,7 @@ main = do
             let objects = getObjects response
                 pathValues = flattenOdf objects
 
-            processData pathValues
+            update delayValues $ ProcessData pathValues
 
         Left err -> logError err
     

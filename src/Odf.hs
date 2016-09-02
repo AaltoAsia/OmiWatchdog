@@ -12,7 +12,7 @@ import Data.Time.ISO8601 (parseISO8601)
 import OdfXsd
 import Util.HaXml()
 
-newtype Path = Path {fromPath :: String}
+newtype Path = Path {fromPath :: String} deriving(Show, Read, Eq, Ord)
 
 class PathLike p where
     toPath :: p -> Path
