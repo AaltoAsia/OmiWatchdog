@@ -17,7 +17,17 @@ run
 Usage
 -----
 
-`$ ./watchdog <url of an O-MI Node`
+Testing:
+
+`$ ./watchdog <url of an O-MI Node>`
+
+Production: Should be run with cron or similar
+
+```
+$ crontab -e
+
+*/5 * * * * ./watchdog <url of an O-MI Node>
+```
 
 The program requires write permissions in its working directory
 to store its state to directory `./state/`.
@@ -26,3 +36,11 @@ NOTE: Storage does not contain the url of the origin node so all
 calls from the same working directory saves the data to same
 storage. This means it will aggregate all data from all calls in
 the same directory.
+
+Runtime state database
+----------------------
+
+Important data stored in directory `./state/DelayStore/`
+
+Unneeded old data (backups) are moved to directory `./state/DelayStore/Archive/`
+
