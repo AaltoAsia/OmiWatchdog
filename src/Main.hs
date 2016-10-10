@@ -72,7 +72,13 @@ runProgram args = do
 
             currentTime <- getCurrentTime
             alerts <- update delayValues $ CheckAlerts currentTime
-            forM_ alerts $ \a -> putStrLn $ (show $ fst a) ++ " " ++ (show $ snd a)
+
+            createCheckpoint delayValues
+            createArchive delayValues
+
+            forM_ alerts $ \a -> putStrLn $ (show $ fst a) ++ " " ++ (show . fromPath $ snd a)
+
+            closeAcidState delayValues
             return ()
 
         Left err -> logError err
