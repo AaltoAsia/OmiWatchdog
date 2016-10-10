@@ -2,9 +2,10 @@ module Main where
 
 --import Text.Read (readMaybe)
 --import Data.Maybe (listToMaybe)
-import Control.Monad (when)
+import Control.Monad (when, forM_)
 import System.Environment (getArgs)
 import System.IO (hPutStr, stderr)
+import Data.Time.Clock (getCurrentTime)
 
 --import qualified Network.HTTP.Server as HTTP
 --import Network.HTTP.Server (Config (..))
@@ -31,9 +32,7 @@ createServer = HTTP.serverWith serverConfig omiHandler
 -}
 
 usage :: String
-usage = "Takes a list of tuples as parameter, where the first"++
-    " element is the path and the second is its maximum update"++
-    " time in minutes"
+usage = "give url plz"
 
 logError :: String -> IO ()
 logError = hPutStr stderr
@@ -43,6 +42,13 @@ logError = hPutStr stderr
 main :: IO ()
 main = do
     args <- getArgs
+    if length args /= 1 then
+        putStrLn usage
+    else
+        runProgram args
+
+runProgram :: [String] -> IO ()
+runProgram args = do
     --let configM :: Maybe [(String, Double)]
     --    configM = listToMaybe args >>= readMaybe
 
@@ -63,6 +69,11 @@ main = do
                 pathValues = flattenOdf objects
 
             update delayValues $ ProcessData pathValues
+
+            currentTime <- getCurrentTime
+            alerts <- update delayValues $ CheckAlerts currentTime
+            forM_ alerts $ \a -> putStrLn $ (show $ fst a) ++ " " ++ (show $ snd a)
+            return ()
 
         Left err -> logError err
     
