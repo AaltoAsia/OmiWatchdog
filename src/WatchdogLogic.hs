@@ -11,6 +11,8 @@ import Control.Monad.Reader (ask)
 import Control.Monad.State (get, put)
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict (Map)
+--import Data.Set (Set)
+--import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
 import Data.Sequence (Seq, (<|))
 import Data.Time.Clock (UTCTime, addUTCTime, diffUTCTime, NominalDiffTime)
@@ -20,7 +22,7 @@ import Odf
 -- calculate running avarage and standard deviation for update interval
 -- save to acid-state
 -- go through unchanged:
---  To filter out false positives:
+-- PSEUDOCODE to filter out false positives:
 --       longerThanUsual =
 --          if std.deviation < 60s && avarage*num > 1h
 --          then
@@ -41,8 +43,14 @@ data StatisticsModel = StatisticsModel
     , sm_delayAverage :: !Double
     , sm_delayStdDeviation :: !Double
     , sm_intervalData :: !(Seq NominalDiffTime)
-    , sm_isNew :: Bool
+    , sm_status :: ItemAlertStatus
     } deriving (Typeable, Show)
+
+data ItemAlertStatus = New               -- ^ New but not alerted
+                     | WorkingNormally   -- ^ Working normally, alerts have been collected
+                     | MissingAlertSent  -- ^ Missing sent, waiting for exceptionally long interval
+                     | LostAlertSent     -- ^ Lost event sent
+                     deriving (Typeable, Show, Eq)
 
 emptyDelayStore :: DelayStore
 emptyDelayStore = DelayStore Map.empty
@@ -62,23 +70,27 @@ processPath (path, (OdfValue newTime _ _)) = do
                             , sm_delayAverage = 0.0
                             , sm_delayStdDeviation = 0.0
                             , sm_intervalData = Seq.empty
-                            , sm_isNew = True
+                            , sm_status = New
                             }
     put $ DelayStore $
         Map.insertWith updateStatistics path newTempData store
 
 updateStatistics :: StatisticsModel -> StatisticsModel -> StatisticsModel
-updateStatistics new old = old { sm_lastSeen          = newTime
-                               , sm_alertTriggerTime  = longerThanUsual `addUTCTime` newTime
-                               , sm_delayAverage      = average
-                               , sm_delayStdDeviation = stdDeviation
-                               , sm_intervalData      = newSeq
-                               , sm_isNew = False
-                               }
+updateStatistics new old =
+    if interval > 0 then
+       old { sm_lastSeen          = newTime
+           , sm_alertTriggerTime  = longerThanUsual `addUTCTime` newTime
+           , sm_delayAverage      = average
+           , sm_delayStdDeviation = stdDeviation
+           , sm_intervalData      = newSeq
+           , sm_status            = if oldStatus == MissingAlertSent || oldStatus == LostAlertSent
+                                    then New
+                                    else oldStatus
+           }
+    else old
   where
     StatisticsModel{sm_lastSeen=newTime} = new 
-    StatisticsModel{sm_lastSeen=oldTime, sm_intervalData=oldSeq} = old 
-    --checkAlert path StatisticsModel{sm_alertTriggerTime=alertTime, sm_intervalData=dataSeq, sm_isNew=isNew} = 
+    StatisticsModel{sm_lastSeen=oldTime, sm_intervalData=oldSeq, sm_status=oldStatus} = old 
     toDouble :: NominalDiffTime -> Double
     toDouble = realToFrac
     toNominal :: Double -> NominalDiffTime
@@ -86,7 +98,8 @@ updateStatistics new old = old { sm_lastSeen          = newTime
 
     addedVals = 1
     numVals = Seq.length oldSeq
-    newSeq' = (newTime `diffUTCTime` oldTime) <| oldSeq
+    interval = newTime `diffUTCTime` oldTime
+    newSeq' = interval <| oldSeq
     newSeq  = Seq.take numberOfHistory newSeq'
     num :: Double
     num = realToFrac $ numVals + addedVals
@@ -122,9 +135,9 @@ median x | null x =
 
 
 type Alert = (AlertType, Path)
-data AlertType = Warning
-               | Missing
-               | Appeared
+data AlertType = Missing
+               | Lost
+               | Online
                deriving (Eq, Show, Read, Typeable)
 
 
@@ -133,33 +146,38 @@ data AlertType = Warning
 checkAlerts :: UTCTime -> Update DelayStore [Alert]
 checkAlerts currentTime = do
     dataMap <- allData <$> get
-    let events = concatMap checkAlert $ Map.toList dataMap
-        newItems = map snd $ filter isAppearedEvent events
+    let events    = concatMap checkAlert $ Map.toList dataMap
+        newItems  = map snd $ filter ((== Online) . fst) events
+        warnItems = map snd $ filter ((== Missing) . fst) events
+        lostItems = map snd $ filter ((== Lost) . fst) events
+        items1 = setFlag WorkingNormally dataMap newItems
+        items2 = setFlag MissingAlertSent items1 warnItems
+        result = setFlag LostAlertSent items2 lostItems
+            -- Map.filterWithKey (\k _ -> k `Set.notMember` lostItems) items2
 
-    -- remove isNew flags:
-    put $ DelayStore $ removeNewFlags dataMap newItems
+    -- remove New flags:
+    put $ DelayStore result 
     return events
 
   where
-    removeNewFlags dataMap (path : rest) =
-       let removeFlag model = model {sm_isNew = False}
+    setFlag flag dataMap (path : rest) =
+       let removeFlag model = model {sm_status = flag}
            newMap = Map.adjust removeFlag path dataMap
-       in removeNewFlags newMap rest
-    removeNewFlags dataMap [] = dataMap
-
-    isAppearedEvent (Appeared, _) = True
-    isAppearedEvent _ = False
+       in setFlag flag newMap rest
+    setFlag _ dataMap [] = dataMap
 
     checkAlert :: (Path, StatisticsModel) -> [Alert]
-    checkAlert (path, StatisticsModel{sm_alertTriggerTime=alertTime, sm_intervalData=dataSeq, sm_isNew=isNew}) = 
+    checkAlert (path, StatisticsModel{sm_alertTriggerTime=alertTime, sm_intervalData=dataSeq, sm_status=status}) = 
         let num = Seq.length dataSeq
             oneDay = realToFrac (24*60*60 :: Int)
         in if num > 3 then
-            if isNew then [(Appeared, path)]
+            if status == New then [(Online, path)]
             else if currentTime > alertTime then
-                if currentTime > addUTCTime oneDay alertTime
-                then [(Missing, path)]
-                else [(Warning, path)]
+                if currentTime > addUTCTime oneDay alertTime &&
+                    status /= LostAlertSent
+                then [(Lost, path)]
+                else if status == WorkingNormally then [(Missing, path)]
+                else []
             else []
         else []
 
@@ -172,6 +190,7 @@ deriveSafeCopy 1 'base ''OdfValue
 deriveSafeCopy 1 'base ''Path
 deriveSafeCopy 1 'base ''DelayStore
 deriveSafeCopy 1 'base ''StatisticsModel
+deriveSafeCopy 1 'base ''ItemAlertStatus
 deriveSafeCopy 1 'base ''AlertType
 
 $(makeAcidic ''DelayStore ['processData, 'processPath, 'getAllData, 'checkAlerts])
