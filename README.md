@@ -17,7 +17,7 @@ Compiling
 Uses the `cabal-install` build system.
 
 Some dependencies might be broken, they can be unpackaged by
-`cabal unpack <package>` and then fixed and installed.
+`cabal unpack <package>` and then fixed and installed `cabal install <dir>`.
 
 _TODO: change to `stackage` for easier compiling._
 
@@ -28,11 +28,15 @@ Run:
 Usage
 -----
 
-Testing:
+**Testing:**
 
 `$ ./OmiWatchdog <url of an O-MI Node>`
 
-Production: Should be run with cron or similar.
+It fetches all items once, does interval calculations, saves the results to the
+state database, checks for alerts, prints the alerts and exits. So run it a
+couple times.
+
+**Production:** Should be run with cron or similar.
 
 **To run a command for every InfoItem that changes state:**
 
@@ -88,4 +92,13 @@ The state database
 Important data stored in directory `./state/DelayStore/`
 
 Unneeded old data (backups) are moved to directory `./state/DelayStore/Archive/`
+
+Future ideas
+------------
+
+* Use a listening O-MI service with an event subscription on the watching target
+  O-MI node.
+* Aggregate the results to parent Object if all child InfoItems are giving the
+  same alert
+* Use stackage for compiling so other than Haskell coders can compile it
 
