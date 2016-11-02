@@ -15,7 +15,7 @@ build-type:          Simple
 extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
-executable K1DebugService
+executable OmiWatchdog
   main-is:             Main.hs
   -- other-modules:       
   -- other-extensions:    
