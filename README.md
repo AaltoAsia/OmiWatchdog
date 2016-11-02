@@ -7,10 +7,12 @@ Compiling
 Uses the `cabal-install` build system.
 
 Some dependencies might be broken, they can be unpackaged by
-`cabal unpack <package>` and then fixed and installed. TODO:
+`cabal unpack <package>` and then fixed and installed.
+
+TODO:
 change to `stackage` for easier compiling.
 
-run
+Run:
 
 `$ cabal install`
 
@@ -21,13 +23,14 @@ Testing:
 
 `$ ./watchdog <url of an O-MI Node>`
 
-Production: Should be run with cron or similar
+Production: Should be run with cron or similar:
 
 ```
 $ crontab -e
 
-*/5 * * * * ./watchdog <url of an O-MI Node>
+*/5 * * * * ./watchdog <url of an O-MI Node> | xargs -n 2 <program to run>
 ```
+xargs splits the lines (2 arguments per each: Event and O-DF path) and runs the program for every event
 
 The program requires write permissions in its working directory
 to store its state to directory `./state/`.
