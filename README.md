@@ -33,6 +33,7 @@ $ crontab -e
 ```
 xargs splits the lines (2 arguments per each: Event and O-DF path) and runs the program for every event
 
+
 **To run the given IFTTT connector script:**
 ```
 $ crontab -e
@@ -48,6 +49,28 @@ to store its state to directory `./state/`.
 calls from the same working directory saves the data to same
 storage. This means it will aggregate all data from all calls in
 the same directory.
+
+
+IFTTT Script
+-----------
+
+There is an experimental script to send the results to IFTTT: `./sendWatchdogNotifications.sh`
+
+It's setup to use `Maker` channel in IFTTT:
+
+* three events: `Online`, `Missing`, `Lost`,
+* value1 is the O-DF path of the InfoItem
+* value2 is the url for data discovery
+* value3 is textual description of what happened
+
+Setup required:
+
+1. Create the three events in IFTTT and connect them to something (we tried Slack)
+2. Edit the script with your Maker channel API key
+3. Setup cron to call the script as specified in [Usage section](#Usage)
+
+Read the script for furher info.
+
 
 The state database
 ----------------------
