@@ -1,6 +1,16 @@
 O-MI Watchdog Tool
 ==================
 
+*Related to standards Open Messaging Interface (O-MI) and Open Data Format (O-DF)*
+
+This tool is used to detect if O-DF InfoItems are not updating on O-MI Nodes.
+It accomplishes that by tracking the update intervals of all items when they still update 
+and then alerts if the current interval will be greater than `avarageInterval + 3 * stdDeviationOfIntervals`.
+
+The tool currently fetches all InfoItems with "read <Objects>" O-MI request 
+which is assumed to return structure containing all InfoItems and (at least) one value for each.
+
+
 Compiling
 ---------
 
@@ -66,7 +76,7 @@ It's setup to use `Maker` channel in IFTTT:
 Setup required:
 
 1. Create the three events in IFTTT and connect them to something (we tried Slack)
-2. Edit the script with your Maker channel API key
+2. Edit the script with your Maker channel API key. You can get it from https://internal-api.ifttt.com/maker
 3. Setup cron to call the script as specified in [Usage section](#Usage)
 
 Read the script for furher info.
