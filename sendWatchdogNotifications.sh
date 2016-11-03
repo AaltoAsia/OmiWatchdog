@@ -1,3 +1,4 @@
+#!/bin/bash
 
 Usage="
 $0 <event> <o-df path>
@@ -14,15 +15,22 @@ Modify this script for IFTTT key and other configuration.
 
 #EMAIL=
 
-IFTTTMakerKey=''
+IFTTTMakerKey='nL1ke_rSdUOwERmhr0gnbLU7GGxfJ4H-bFMHIXeAtZa'
 
 
+# UTIL
 
 # $1 is seperator, others are array elements
 function join_by { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}";  }
-function unquote { local temp="${1%\"}"; temp="${temp#\"}"; echo "$temp"; }
+
+#function unquote { local temp="${1%\"}"; temp="${temp#\"}"; echo "$temp"; }
+
+# $1 result array $2 string to parse to array
+function qs_parse { readarray -t $1 < <( echo $2|xargs -n 1 echo  ) ; }
 
 NL='\n'
+
+
 
 
 trigger_mail(){
@@ -31,12 +39,12 @@ trigger_mail(){
 
 
 trigger_ifttt(){
-    set -x
+    #set -x
     Return=`curl -X POST -H "Content-Type: application/json" \
         -d '{"value1":"'"$ObjectPath"'","value2":"'"$ObjectURL"'","value3":"'"$Reason"'"}' \
         "https://maker.ifttt.com/trigger/$Event/with/key/$IFTTTMakerKey" \
         -s`
-    set +x
+    #set +x
     if [[ "$Return" != "Congratulations! You've fired the $Event event" ]]; then
         echo "$Return"
     fi
@@ -49,9 +57,10 @@ if [[ "$1" == "-" ]]; then
     declare -a Losts
 
     while read line; do
-        data=($line)
+        #data=($line)
+        qs_parse data "$line"
         Event=${data[0]}
-        ObjectPath=`unquote ${data[1]}`
+        ObjectPath=${data[1]}
         case $Event in
             Online)
                 Onlines=("${Onlines[@]}" "$ObjectPath")
