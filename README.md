@@ -44,6 +44,7 @@ couple times.
 $ crontab -e
 
 */5 * * * * cd OmiWatchdog && ./OmiWatchdog <url of an O-MI Node> | xargs -n 2 <program to run>
+10 1 * * * rm -r OmiWatchdog/state/DelayStore/Archive/
 ```
 xargs splits the lines (2 arguments per each: Event and O-DF path) and runs the program for every event
 
@@ -53,6 +54,7 @@ xargs splits the lines (2 arguments per each: Event and O-DF path) and runs the 
 $ crontab -e
 
 */5 * * * * cd OmiWatchdog && ./OmiWatchdog <url of an O-MI Node> | ./sendWatchdogNotifications.sh -
+10 1 * * * rm -r OmiWatchdog/state/DelayStore/Archive/
 ```
 
 
@@ -92,6 +94,7 @@ The state database
 Important data stored in directory `./state/DelayStore/`
 
 Unneeded old data (backups) are moved to directory `./state/DelayStore/Archive/`
+WARNING: Remember to remove archived files with cron or similar, otherwise you might run out of disk space!
 
 Future ideas
 ------------
